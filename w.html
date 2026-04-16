@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<!-- saved from url=(0070)file:///Users/jamesmurphy/Documents/Claude/Projects/My%20Health/w.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Workouts">
+<title>Workout Program</title>
+<link href="./Workout Program_files/css2" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0e0e10;
+    color: #f0eff4;
+    font-family: 'DM Sans', sans-serif;
+    padding: 0 0 40px;
+  }
+
+  .header {
+    position: sticky;
+    top: 0;
+    background: #0e0e10;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    z-index: 10;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .header-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  .header-sub {
+    font-size: 13px;
+    color: #888894;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .cycle-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .cycle-label {
+    font-size: 12px;
+    color: #888894;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .cycle-track {
+    flex: 1;
+    height: 4px;
+    background: #232328;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .cycle-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: #7f77dd;
+    transition: width 0.4s ease;
+  }
+
+  .cycle-count {
+    font-size: 12px;
+    color: #7f77dd;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .day-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .day-tabs::-webkit-scrollbar { display: none; }
+
+  .day-btn {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: transparent;
+    color: #888894;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s ease;
+  }
+
+  .day-btn.active {
+    background: #7f77dd;
+    border-color: #7f77dd;
+    color: #fff;
+  }
+
+  .day-btn.done {
+    text-decoration: line-through;
+    color: #555560;
+    border-color: rgba(255,255,255,0.07);
+  }
+
+  .day-btn.active.done {
+    background: #3d3a66;
+    border-color: #3d3a66;
+    color: #888894;
+    text-decoration: line-through;
+  }
+
+  .content { padding: 16px; }
+
+  .day-heading {
+    font-size: 13px;
+    font-weight: 500;
+    color: #888894;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .done-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 9px;
+    border-radius: 20px;
+    background: rgba(29,158,117,0.12);
+    color: #1d9e75;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .block-card {
+    background: #1a1a1e;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    /* will-change lets the GPU prep the layer for animation */
+    will-change: transform, opacity;
+  }
+
+  .block-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .block-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .badge-A { background: rgba(127,119,221,0.15); color: #7f77dd; }
+  .badge-B { background: rgba(29,158,117,0.12); color: #1d9e75; }
+  .badge-C { background: rgba(239,159,39,0.12); color: #ef9f27; }
+  .badge-D { background: rgba(216,90,48,0.12); color: #d85a30; }
+
+  .block-label {
+    font-size: 12px;
+    color: #888894;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+
+  .block-sets {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: #888894;
+    background: #232328;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .exercise-row {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .exercise-row:last-child { border-bottom: none; }
+
+  .ex-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: #f0eff4;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  .ex-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .chip {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .chip-weight { background: rgba(127,119,221,0.12); color: #a9a4ec; }
+  .chip-reps { background: #232328; color: #888894; }
+
+  .complete-area {
+    padding: 20px 0 4px;
+  }
+
+  .btn-complete {
+    width: 100%;
+    padding: 15px;
+    border-radius: 14px;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s ease;
+    background: #7f77dd;
+    color: #fff;
+    letter-spacing: -0.2px;
+  }
+
+  .btn-complete:active { transform: scale(0.97); }
+
+  .btn-complete.is-done {
+    background: #1e1e22;
+    color: #555560;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .btn-complete.is-done:active {
+    background: #2a2a30;
+    color: #888894;
+  }
+
+  /* Reset section */
+  .reset-area {
+    margin: 40px 16px 0;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .reset-meta {
+    font-size: 12px;
+    color: #555560;
+    font-family: 'DM Mono', monospace;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .btn-reset {
+    width: 100%;
+    padding: 13px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: transparent;
+    color: #555560;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s ease;
+    letter-spacing: -0.2px;
+  }
+
+  .btn-reset:active {
+    background: #1e1e22;
+    color: #888894;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <span class="header-title">Workouts</span>
+    <span class="header-sub" id="cycleSubtitle">14 days left</span>
+  </div>
+  <div class="cycle-bar">
+    <span class="cycle-label">Cycle</span>
+    <div class="cycle-track"><div class="cycle-fill" id="cycleFill" style="width:0%"></div></div>
+    <span class="cycle-count" id="cycleCount">0/7</span>
+  </div>
+  <div class="day-tabs" id="dayTabs"><button class="day-btn" onclick="selectDay(&#39;Day 1&#39;)">Day 1</button><button class="day-btn" onclick="selectDay(&#39;Day 2&#39;)">Day 2</button><button class="day-btn" onclick="selectDay(&#39;Day 3&#39;)">Day 3</button><button class="day-btn" onclick="selectDay(&#39;Day 4&#39;)">Day 4</button><button class="day-btn" onclick="selectDay(&#39;Day 5&#39;)">Day 5</button><button class="day-btn active" onclick="selectDay(&#39;Day 6&#39;)">Day 6</button><button class="day-btn" onclick="selectDay(&#39;Day 7&#39;)">Day 7</button></div>
+</div>
+
+<div class="content" id="content"><div class="day-heading">Day 6 </div><div class="block-card" data-block-index="0">
+      <div class="block-header">
+        <div class="block-badge badge-A">A</div>
+        <span class="block-label">Block A</span>
+        <span class="block-sets">3 sets</span>
+      </div>
+      <div class="exercise-row">
+          <div class="ex-name">Dumbell Floor Press</div>
+          <div class="ex-chips">
+            <span class="chip chip-weight">40 lb</span>
+            <span class="chip chip-reps">10 reps</span>
+          </div>
+        </div>
+    </div><div class="block-card" data-block-index="1">
+      <div class="block-header">
+        <div class="block-badge badge-B">B</div>
+        <span class="block-label">Block B</span>
+        <span class="block-sets">3 sets</span>
+      </div>
+      <div class="exercise-row">
+          <div class="ex-name">3-Point Dumbell Rows</div>
+          <div class="ex-chips">
+            <span class="chip chip-weight">45 lb</span>
+            <span class="chip chip-reps">12 reps</span>
+          </div>
+        </div>
+    </div><div class="block-card" data-block-index="2">
+      <div class="block-header">
+        <div class="block-badge badge-C">C</div>
+        <span class="block-label">Block C</span>
+        <span class="block-sets">3 sets</span>
+      </div>
+      <div class="exercise-row">
+          <div class="ex-name">Bulgarian Split Squat</div>
+          <div class="ex-chips">
+            <span class="chip chip-weight">45 lb</span>
+            <span class="chip chip-reps">8 reps each side</span>
+          </div>
+        </div>
+    </div><div class="block-card" data-block-index="3">
+      <div class="block-header">
+        <div class="block-badge badge-D">D</div>
+        <span class="block-label">Block D</span>
+        <span class="block-sets">3 sets</span>
+      </div>
+      <div class="exercise-row">
+          <div class="ex-name">30b Narrow Pulldowns</div>
+          <div class="ex-chips">
+            <span class="chip chip-weight">220 lb</span>
+            <span class="chip chip-reps">10 reps</span>
+          </div>
+        </div>
+    </div><div class="complete-area">
+      <button class="btn-complete" onclick="handleComplete()">Mark as complete</button>
+    </div></div>
+
+<div class="reset-area">
+  <div class="reset-meta" id="resetMeta">Started Apr 14, 2026 · resets in 14 days</div>
+  <button class="btn-reset" onclick="handleReset()">Start new cycle</button>
+</div>
+
+<script>
+const CYCLE_DAYS = 14;
+const STORAGE_START     = 'cycle_start';
+const STORAGE_COMPLETED = 'cycle_completed';
+const STORAGE_HIDDEN    = 'hidden_blocks';
+
+const program = {
+  "Day 1": [
+    { block: "A", sets: 4, exercises: [
+      { name: "Dumbell Goblet Squat", weight: "60 lb", reps: "12 reps" }
+    ]},
+    { block: "B", sets: 3, exercises: [
+      { name: "Dumbell Romanian Deadlift", weight: "52.5 lb", reps: "10 reps" }
+    ]},
+    { block: "C", sets: 3, exercises: [
+      { name: "Alternating Dumbell Bicep Curl", weight: "25 lb", reps: "10 reps each side" },
+      { name: "Dumbell Hammer Curl", weight: "25 lb", reps: "12 reps" }
+    ]},
+    { block: "D", sets: 3, exercises: [
+      { name: "Dumbell French Press", weight: "36 lb", reps: "10 reps" },
+      { name: "Push-up Wheel", weight: "BW", reps: "8 reps" }
+    ]}
+  ],
+  "Day 2": [
+    { block: "A", sets: 4, exercises: [
+      { name: "Barbell Bench Press", weight: "210–240 lb", reps: "10 reps" }
+    ]},
+    { block: "B", sets: 3, exercises: [
+      { name: "18a Dumbell Chest Fly", weight: "80 lb", reps: "10 reps" },
+      { name: "Front Loaded Kettlebell Carry", weight: "45 lb", reps: "30 seconds" }
+    ]},
+    { block: "C", sets: 3, exercises: [
+      { name: "Bicep Curl", weight: "25 lb", reps: "10 reps" },
+      { name: "Hammer Curl", weight: "25 lb", reps: "10 reps" },
+      { name: "Club 360s", weight: "18 lb", reps: "10 reps" }
+    ]}
+  ],
+  "Day 3": [
+    { block: "A", sets: 4, exercises: [
+      { name: "3-Point Dumbell Rows", weight: "45 lb", reps: "12 reps each side" }
+    ]},
+    { block: "B", sets: 4, exercises: [
+      { name: "30b Narrow Pulldowns", weight: "220 lb", reps: "10 reps" }
+    ]},
+    { block: "C", sets: 4, exercises: [
+      { name: "26b Reverse Fly", weight: "60 lb", reps: "10 reps" }
+    ]},
+    { block: "D", sets: 4, exercises: [
+      { name: "44a Trunk Rotation", weight: "100 lb", reps: "12 reps" }
+    ]}
+  ],
+  "Day 4": [
+    { block: "A", sets: 3, exercises: [
+      { name: "Two-hand Swing", weight: "45 lb", reps: "10 reps" },
+      { name: "One-Arm Swing L", weight: "45 lb", reps: "10 reps" },
+      { name: "One-Arm Swing R", weight: "45 lb", reps: "10 reps" }
+    ]},
+    { block: "B", sets: 3, exercises: [
+      { name: "51a Single-leg Leg-press", weight: "230 lb", reps: "10 reps" }
+    ]},
+    { block: "C", sets: 3, exercises: [
+      { name: "52a Prone Leg Curl", weight: "120 lb", reps: "12 reps" }
+    ]},
+    { block: "D", sets: 3, exercises: [
+      { name: "Club 360s", weight: "18 lb", reps: "10 reps each side" }
+    ]}
+  ],
+  "Day 5": [
+    { block: "A", sets: 3, exercises: [
+      { name: "Dumbell Floor Press", weight: "40 lb", reps: "10 reps" }
+    ]},
+    { block: "B", sets: 3, exercises: [
+      { name: "Single Arm Kettlebell Overhead Press", weight: "21 lb", reps: "10 reps each side" },
+      { name: "Kettlebell Suitcase Carry", weight: "48 lb", reps: "30 sec each side" }
+    ]},
+    { block: "C", sets: 3, exercises: [
+      { name: "Dumbell Romanian Deadlift", weight: "52.5 lb", reps: "10 reps" }
+    ]}
+  ],
+  "Day 6": [
+    { block: "A", sets: 3, exercises: [
+      { name: "Dumbell Floor Press", weight: "40 lb", reps: "10 reps" }
+    ]},
+    { block: "B", sets: 3, exercises: [
+      { name: "3-Point Dumbell Rows", weight: "45 lb", reps: "12 reps" }
+    ]},
+    { block: "C", sets: 3, exercises: [
+      { name: "Bulgarian Split Squat", weight: "45 lb", reps: "8 reps each side" }
+    ]},
+    { block: "D", sets: 3, exercises: [
+      { name: "30b Narrow Pulldowns", weight: "220 lb", reps: "10 reps" }
+    ]}
+  ],
+  "Day 7": [
+    { block: "A", sets: 3, exercises: [
+      { name: "Barbell Bench Press", weight: "210–240 lb", reps: "8 reps" }
+    ]},
+    { block: "B", sets: 3, exercises: [
+      { name: "Club 360s", weight: "21 lb", reps: "10 reps each side" },
+      { name: "Kettlebell Suitcase Carry", weight: "45 lb", reps: "30 sec each side" }
+    ]},
+    { block: "C", sets: 3, exercises: [
+      { name: "44a Trunk Rotation", weight: "100 lb", reps: "10 reps" },
+      { name: "Kettlebell French Press", weight: "36 lb", reps: "10 reps" }
+    ]}
+  ]
+};
+
+const days = Object.keys(program);
+let current = localStorage.getItem('selectedDay') || "Day 1";
+
+// --- Cycle helpers ---
+function getCycleStart() {
+  const stored = localStorage.getItem(STORAGE_START);
+  if (stored) return new Date(parseInt(stored, 10));
+  const now = Date.now();
+  localStorage.setItem(STORAGE_START, now);
+  return new Date(now);
+}
+
+function getDaysRemaining() {
+  const start = getCycleStart();
+  const end = new Date(start.getTime() + CYCLE_DAYS * 86400000);
+  const remaining = Math.ceil((end - Date.now()) / 86400000);
+  return Math.max(0, remaining);
+}
+
+function formatStartDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getCompleted() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_COMPLETED) || '[]'); }
+  catch { return []; }
+}
+
+function setCompleted(arr) {
+  localStorage.setItem(STORAGE_COMPLETED, JSON.stringify(arr));
+}
+
+function isDone(day) { return getCompleted().includes(day); }
+
+function toggleDone(day) {
+  let completed = getCompleted();
+  if (completed.includes(day)) {
+    completed = completed.filter(d => d !== day);
+  } else {
+    completed.push(day);
+  }
+  setCompleted(completed);
+}
+
+// --- Hidden block helpers ---
+function getHiddenBlocks() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_HIDDEN) || '{}'); }
+  catch { return {}; }
+}
+
+function isBlockHidden(day, blockIdx) {
+  const hidden = getHiddenBlocks();
+  return !!(hidden[day] && hidden[day].includes(blockIdx));
+}
+
+function hideBlock(day, blockIdx) {
+  const hidden = getHiddenBlocks();
+  if (!hidden[day]) hidden[day] = [];
+  if (!hidden[day].includes(blockIdx)) hidden[day].push(blockIdx);
+  localStorage.setItem(STORAGE_HIDDEN, JSON.stringify(hidden));
+}
+
+function handleReset() {
+  localStorage.setItem(STORAGE_START, Date.now());
+  setCompleted([]);
+  localStorage.removeItem(STORAGE_HIDDEN);
+  renderAll();
+}
+
+// --- Swipe to hide ---
+function addSwipeListeners() {
+  document.querySelectorAll('.block-card').forEach(card => {
+    let startX = 0, startY = 0, tracking = false, dismissed = false;
+
+    card.addEventListener('touchstart', e => {
+      if (dismissed) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      tracking = true;
+      // Remove any transition so dragging feels instant
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    card.addEventListener('touchmove', e => {
+      if (!tracking || dismissed) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      // Only intercept clearly horizontal left-swipes
+      if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
+        const clamped = Math.max(dx, -window.innerWidth);
+        card.style.transform = `translateX(${clamped}px)`;
+        // Fade out as it travels — fully transparent at half-screen
+        card.style.opacity = String(Math.max(0, 1 + clamped / (window.innerWidth * 0.5)));
+      }
+    }, { passive: true });
+
+    card.addEventListener('touchend', e => {
+      if (!tracking || dismissed) return;
+      tracking = false;
+      const dx = e.changedTouches[0].clientX - startX;
+
+      if (dx < -80) {
+        // Crossed threshold — commit the dismiss
+        dismissed = true;
+        const blockIdx = parseInt(card.dataset.blockIndex, 10);
+
+        // Phase 1: slide fully off screen
+        card.style.transition = 'transform 0.25s ease-out, opacity 0.2s ease-out';
+        card.style.transform = 'translateX(-110vw)';
+        card.style.opacity = '0';
+
+        setTimeout(() => {
+          // Phase 2: collapse height so cards below slide up
+          const h = card.offsetHeight;
+          card.style.transition = 'none';
+          card.style.maxHeight = h + 'px';
+          card.style.overflow = 'hidden';
+          // Force reflow so the browser registers the starting max-height
+          void card.offsetHeight;
+          card.style.transition = 'max-height 0.25s ease-out, margin-bottom 0.25s ease-out';
+          card.style.maxHeight = '0';
+          card.style.marginBottom = '0';
+
+          setTimeout(() => {
+            // Save state and remove from DOM — no re-render needed
+            hideBlock(current, blockIdx);
+            card.remove();
+          }, 260);
+        }, 260);
+
+      } else {
+        // Didn't reach threshold — snap back
+        card.style.transition = 'transform 0.25s ease-out, opacity 0.2s ease-out';
+        card.style.transform = '';
+        card.style.opacity = '';
+        setTimeout(() => { if (!dismissed) card.style.transition = ''; }, 260);
+      }
+    }, { passive: true });
+  });
+}
+
+// --- Render ---
+function updateCycleBar() {
+  const completed = getCompleted();
+  const count = completed.length;
+  const pct = Math.round((count / 7) * 100);
+  const remaining = getDaysRemaining();
+  const start = getCycleStart();
+
+  document.getElementById('cycleFill').style.width = pct + '%';
+  document.getElementById('cycleCount').textContent = count + '/7';
+  document.getElementById('cycleSubtitle').textContent = remaining + ' days left';
+  document.getElementById('resetMeta').textContent =
+    'Started ' + formatStartDate(start) + ' · resets in ' + remaining + ' day' + (remaining === 1 ? '' : 's');
+}
+
+function renderTabs() {
+  document.getElementById("dayTabs").innerHTML = days.map(d => {
+    const done = isDone(d);
+    const active = d === current;
+    let cls = 'day-btn';
+    if (active) cls += ' active';
+    if (done) cls += ' done';
+    return `<button class="${cls}" onclick="selectDay('${d}')">${d}</button>`;
+  }).join('');
+}
+
+function renderContent() {
+  const data = program[current];
+  const done = isDone(current);
+
+  // Render only blocks that haven't been swiped away
+  const blocksHtml = data.map((block, blockIdx) => {
+    if (isBlockHidden(current, blockIdx)) return '';
+    return `<div class="block-card" data-block-index="${blockIdx}">
+      <div class="block-header">
+        <div class="block-badge badge-${block.block}">${block.block}</div>
+        <span class="block-label">Block ${block.block}</span>
+        <span class="block-sets">${block.sets} sets</span>
+      </div>
+      ${block.exercises.map(ex =>
+        `<div class="exercise-row">
+          <div class="ex-name">${ex.name}</div>
+          <div class="ex-chips">
+            <span class="chip chip-weight">${ex.weight}</span>
+            <span class="chip chip-reps">${ex.reps}</span>
+          </div>
+        </div>`
+      ).join('')}
+    </div>`;
+  }).join('');
+
+  const headingBadge = done ? `<span class="done-badge">✓ DONE</span>` : '';
+  const btnLabel = done ? 'Mark as incomplete' : 'Mark as complete';
+  const btnClass = done ? 'btn-complete is-done' : 'btn-complete';
+
+  document.getElementById("content").innerHTML =
+    `<div class="day-heading">${current} ${headingBadge}</div>` +
+    blocksHtml +
+    `<div class="complete-area">
+      <button class="${btnClass}" onclick="handleComplete()">${btnLabel}</button>
+    </div>`;
+
+  window.scrollTo(0, 0);
+}
+
+function renderAll() {
+  updateCycleBar();
+  renderTabs();
+  renderContent();
+  addSwipeListeners(); // attach after DOM is updated
+}
+
+function handleComplete() {
+  toggleDone(current);
+  renderAll();
+}
+
+function selectDay(day) {
+  current = day;
+  localStorage.setItem('selectedDay', day);
+  renderAll();
+  document.querySelector('.day-btn.active').scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+renderAll();
+</script>
+
+
+</body></html>
