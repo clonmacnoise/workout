@@ -81,49 +81,40 @@
     white-space: nowrap;
   }
 
-  .day-tabs {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-  }
-  .day-tabs::-webkit-scrollbar { display: none; }
-
-  .day-btn {
-    flex-shrink: 0;
-    padding: 7px 14px;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.14);
-    background: transparent;
-    color: #888894;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.15s ease;
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
 
-  .day-btn.active {
-    background: #7f77dd;
-    border-color: #7f77dd;
-    color: #fff;
+  .status-item {
+    min-width: 0;
+    padding: 9px 10px;
+    border-radius: 12px;
+    background: #1a1a1e;
+    border: 1px solid rgba(255,255,255,0.08);
   }
 
-  .day-btn.done {
-    text-decoration: line-through;
+  .status-label {
+    display: block;
+    font-size: 10px;
     color: #555560;
-    border-color: rgba(255,255,255,0.07);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
   }
 
-  .day-btn.active.done {
-    background: #3d3a66;
-    border-color: #3d3a66;
-    color: #888894;
-    text-decoration: line-through;
+  .status-value {
+    display: block;
+    color: #f0eff4;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
   }
+
+  .status-value.good { color: #48c59b; }
+  .status-value.warn { color: #ef9f27; }
 
   .content { padding: 16px; }
 
@@ -151,6 +142,11 @@
     color: #1d9e75;
     font-weight: 600;
     letter-spacing: 0.5px;
+  }
+
+  .missed-badge {
+    background: rgba(239,159,39,0.12);
+    color: #ef9f27;
   }
 
   .block-card {
@@ -232,6 +228,7 @@
 
   .chip-weight { background: rgba(127,119,221,0.12); color: #a9a4ec; }
   .chip-reps { background: #232328; color: #888894; }
+  .chip-note { background: rgba(29,158,117,0.12); color: #48c59b; }
 
   .complete-area {
     padding: 20px 0 4px;
@@ -266,41 +263,6 @@
     color: #888894;
   }
 
-  /* Reset section */
-  .reset-area {
-    margin: 40px 16px 0;
-    padding-top: 24px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-  }
-
-  .reset-meta {
-    font-size: 12px;
-    color: #555560;
-    font-family: 'DM Mono', monospace;
-    text-align: center;
-    margin-bottom: 12px;
-  }
-
-  .btn-reset {
-    width: 100%;
-    padding: 13px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: transparent;
-    color: #555560;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.2s ease;
-    letter-spacing: -0.2px;
-  }
-
-  .btn-reset:active {
-    background: #1e1e22;
-    color: #888894;
-  }
 </style>
 </head>
 <body>
@@ -315,7 +277,20 @@
     <div class="cycle-track"><div class="cycle-fill" id="cycleFill" style="width:0%"></div></div>
     <span class="cycle-count" id="cycleCount">0/7</span>
   </div>
-  <div class="day-tabs" id="dayTabs"><button class="day-btn" onclick="selectDay(&#39;Day 1&#39;)">Day 1</button><button class="day-btn" onclick="selectDay(&#39;Day 2&#39;)">Day 2</button><button class="day-btn" onclick="selectDay(&#39;Day 3&#39;)">Day 3</button><button class="day-btn" onclick="selectDay(&#39;Day 4&#39;)">Day 4</button><button class="day-btn" onclick="selectDay(&#39;Day 5&#39;)">Day 5</button><button class="day-btn active" onclick="selectDay(&#39;Day 6&#39;)">Day 6</button><button class="day-btn" onclick="selectDay(&#39;Day 7&#39;)">Day 7</button></div>
+  <div class="status-grid" id="cycleStatus">
+    <div class="status-item">
+      <span class="status-label">Completed</span>
+      <span class="status-value good" id="completedCount">0/7</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">Missed</span>
+      <span class="status-value warn" id="missedCount">0</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">Next</span>
+      <span class="status-value" id="nextWorkout">--</span>
+    </div>
+  </div>
 </div>
 
 <div class="content" id="content"><div class="day-heading">Day 6 </div><div class="block-card" data-block-index="0">
@@ -374,140 +349,85 @@
       <button class="btn-complete" onclick="handleComplete()">Mark as complete</button>
     </div></div>
 
-<div class="reset-area">
-  <div class="reset-meta" id="resetMeta">Started Apr 14, 2026 · resets in 14 days</div>
-  <button class="btn-reset" onclick="handleReset()">Start new cycle</button>
-</div>
 
+<script src="./program.js"></script>
 <script>
 const CYCLE_DAYS = 14;
+const WORKOUT_GAP_DAYS = 2;
+const OFFICIAL_START_DATE = new Date(2026, 5, 9);
 const STORAGE_START     = 'cycle_start';
 const STORAGE_COMPLETED = 'cycle_completed';
 const STORAGE_HIDDEN    = 'hidden_blocks';
 
-const program = {
-  "Day 1": [
-    { block: "A", sets: 4, exercises: [
-      { name: "Dumbell Goblet Squat", weight: "60 lb", reps: "12 reps" }
-    ]},
-    { block: "B", sets: 3, exercises: [
-      { name: "Dumbell Romanian Deadlift", weight: "52.5 lb", reps: "10 reps" }
-    ]},
-    { block: "C", sets: 3, exercises: [
-      { name: "Alternating Dumbell Bicep Curl", weight: "25 lb", reps: "10 reps each side" },
-      { name: "Dumbell Hammer Curl", weight: "25 lb", reps: "12 reps" }
-    ]},
-    { block: "D", sets: 3, exercises: [
-      { name: "Dumbell French Press", weight: "36 lb", reps: "10 reps" },
-      { name: "Push-up Wheel", weight: "BW", reps: "8 reps" }
-    ]}
-  ],
-  "Day 2": [
-    { block: "A", sets: 4, exercises: [
-      { name: "Barbell Bench Press", weight: "210–240 lb", reps: "10 reps" }
-    ]},
-    { block: "B", sets: 3, exercises: [
-      { name: "18a Dumbell Chest Fly", weight: "80 lb", reps: "10 reps" },
-      { name: "Front Loaded Kettlebell Carry", weight: "45 lb", reps: "30 seconds" }
-    ]},
-    { block: "C", sets: 3, exercises: [
-      { name: "Bicep Curl", weight: "25 lb", reps: "10 reps" },
-      { name: "Hammer Curl", weight: "25 lb", reps: "10 reps" },
-      { name: "Club 360s", weight: "18 lb", reps: "10 reps" }
-    ]}
-  ],
-  "Day 3": [
-    { block: "A", sets: 4, exercises: [
-      { name: "3-Point Dumbell Rows", weight: "45 lb", reps: "12 reps each side" }
-    ]},
-    { block: "B", sets: 4, exercises: [
-      { name: "30b Narrow Pulldowns", weight: "220 lb", reps: "10 reps" }
-    ]},
-    { block: "C", sets: 4, exercises: [
-      { name: "26b Reverse Fly", weight: "60 lb", reps: "10 reps" }
-    ]},
-    { block: "D", sets: 4, exercises: [
-      { name: "44a Trunk Rotation", weight: "100 lb", reps: "12 reps" }
-    ]}
-  ],
-  "Day 4": [
-    { block: "A", sets: 3, exercises: [
-      { name: "Two-hand Swing", weight: "45 lb", reps: "10 reps" },
-      { name: "One-Arm Swing L", weight: "45 lb", reps: "10 reps" },
-      { name: "One-Arm Swing R", weight: "45 lb", reps: "10 reps" }
-    ]},
-    { block: "B", sets: 3, exercises: [
-      { name: "51a Single-leg Leg-press", weight: "230 lb", reps: "10 reps" }
-    ]},
-    { block: "C", sets: 3, exercises: [
-      { name: "52a Prone Leg Curl", weight: "120 lb", reps: "12 reps" }
-    ]},
-    { block: "D", sets: 3, exercises: [
-      { name: "Club 360s", weight: "18 lb", reps: "10 reps each side" }
-    ]}
-  ],
-  "Day 5": [
-    { block: "A", sets: 3, exercises: [
-      { name: "Dumbell Floor Press", weight: "40 lb", reps: "10 reps" }
-    ]},
-    { block: "B", sets: 3, exercises: [
-      { name: "Single Arm Kettlebell Overhead Press", weight: "21 lb", reps: "10 reps each side" },
-      { name: "Kettlebell Suitcase Carry", weight: "48 lb", reps: "30 sec each side" }
-    ]},
-    { block: "C", sets: 3, exercises: [
-      { name: "Dumbell Romanian Deadlift", weight: "52.5 lb", reps: "10 reps" }
-    ]}
-  ],
-  "Day 6": [
-    { block: "A", sets: 3, exercises: [
-      { name: "Dumbell Floor Press", weight: "40 lb", reps: "10 reps" }
-    ]},
-    { block: "B", sets: 3, exercises: [
-      { name: "3-Point Dumbell Rows", weight: "45 lb", reps: "12 reps" }
-    ]},
-    { block: "C", sets: 3, exercises: [
-      { name: "Bulgarian Split Squat", weight: "45 lb", reps: "8 reps each side" }
-    ]},
-    { block: "D", sets: 3, exercises: [
-      { name: "30b Narrow Pulldowns", weight: "220 lb", reps: "10 reps" }
-    ]}
-  ],
-  "Day 7": [
-    { block: "A", sets: 3, exercises: [
-      { name: "Barbell Bench Press", weight: "210–240 lb", reps: "8 reps" }
-    ]},
-    { block: "B", sets: 3, exercises: [
-      { name: "Club 360s", weight: "21 lb", reps: "10 reps each side" },
-      { name: "Kettlebell Suitcase Carry", weight: "45 lb", reps: "30 sec each side" }
-    ]},
-    { block: "C", sets: 3, exercises: [
-      { name: "44a Trunk Rotation", weight: "100 lb", reps: "10 reps" },
-      { name: "Kettlebell French Press", weight: "36 lb", reps: "10 reps" }
-    ]}
-  ]
-};
+const program = window.WORKOUT_PROGRAM;
+if (!program) throw new Error('Workout program failed to load.');
 
 const days = Object.keys(program);
-let current = localStorage.getItem('selectedDay') || "Day 1";
+let current = "Day 1";
 
 // --- Cycle helpers ---
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function addDays(d, daysToAdd) {
+  const next = new Date(d);
+  next.setDate(next.getDate() + daysToAdd);
+  return next;
+}
+
+function saveCycleStart(date) {
+  const start = startOfDay(date);
+  localStorage.setItem(STORAGE_START, start.getTime());
+  setCompleted([]);
+  localStorage.removeItem(STORAGE_HIDDEN);
+  return start;
+}
+
 function getCycleStart() {
+  const today = startOfDay(new Date());
+  const officialStart = startOfDay(OFFICIAL_START_DATE);
   const stored = localStorage.getItem(STORAGE_START);
-  if (stored) return new Date(parseInt(stored, 10));
-  const now = Date.now();
-  localStorage.setItem(STORAGE_START, now);
-  return new Date(now);
+
+  if (!stored) return saveCycleStart(officialStart);
+
+  const parsed = parseInt(stored, 10);
+  if (Number.isNaN(parsed)) return saveCycleStart(officialStart);
+
+  const start = startOfDay(new Date(parsed));
+  const cycleEnd = addDays(start, CYCLE_DAYS);
+
+  if (start < officialStart) return saveCycleStart(officialStart);
+  if (today >= cycleEnd) return saveCycleStart(today);
+
+  return start;
+}
+
+function getToday() {
+  return startOfDay(new Date());
 }
 
 function getDaysRemaining() {
   const start = getCycleStart();
-  const end = new Date(start.getTime() + CYCLE_DAYS * 86400000);
-  const remaining = Math.ceil((end - Date.now()) / 86400000);
+  const end = addDays(start, CYCLE_DAYS);
+  const remaining = Math.ceil((end - getToday()) / 86400000);
   return Math.max(0, remaining);
 }
 
 function formatStartDate(d) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatShortDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+}
+
+function getSchedule() {
+  const start = getCycleStart();
+  return days.map((day, index) => ({
+    day,
+    date: addDays(start, index * WORKOUT_GAP_DAYS)
+  }));
 }
 
 function getCompleted() {
@@ -521,7 +441,25 @@ function setCompleted(arr) {
 
 function isDone(day) { return getCompleted().includes(day); }
 
+function getMissed() {
+  const today = getToday();
+  return getSchedule()
+    .filter(item => !isDone(item.day) && today >= addDays(item.date, WORKOUT_GAP_DAYS))
+    .map(item => item.day);
+}
+
+function getScheduleItem(day) {
+  return getSchedule().find(item => item.day === day);
+}
+
+function getActiveDay() {
+  const missed = getMissed();
+  const next = getSchedule().find(item => !isDone(item.day) && !missed.includes(item.day));
+  return next ? next.day : days[days.length - 1];
+}
+
 function toggleDone(day) {
+  if (getMissed().includes(day)) return;
   let completed = getCompleted();
   if (completed.includes(day)) {
     completed = completed.filter(d => d !== day);
@@ -550,9 +488,7 @@ function hideBlock(day, blockIdx) {
 }
 
 function handleReset() {
-  localStorage.setItem(STORAGE_START, Date.now());
-  setCompleted([]);
-  localStorage.removeItem(STORAGE_HIDDEN);
+  saveCycleStart(getToday());
   renderAll();
 }
 
@@ -631,32 +567,34 @@ function addSwipeListeners() {
 // --- Render ---
 function updateCycleBar() {
   const completed = getCompleted();
-  const count = completed.length;
-  const pct = Math.round((count / 7) * 100);
+  const missed = getMissed();
+  const completeCount = completed.length;
+  const missedCount = missed.length;
+  const resolvedCount = completeCount + missedCount;
+  const pct = Math.round((resolvedCount / days.length) * 100);
   const remaining = getDaysRemaining();
   const start = getCycleStart();
+  const activeItem = getScheduleItem(current);
 
   document.getElementById('cycleFill').style.width = pct + '%';
-  document.getElementById('cycleCount').textContent = count + '/7';
+  document.getElementById('cycleCount').textContent = completeCount + ' done · ' + missedCount + ' missed';
   document.getElementById('cycleSubtitle').textContent = remaining + ' days left';
-  document.getElementById('resetMeta').textContent =
-    'Started ' + formatStartDate(start) + ' · resets in ' + remaining + ' day' + (remaining === 1 ? '' : 's');
-}
-
-function renderTabs() {
-  document.getElementById("dayTabs").innerHTML = days.map(d => {
-    const done = isDone(d);
-    const active = d === current;
-    let cls = 'day-btn';
-    if (active) cls += ' active';
-    if (done) cls += ' done';
-    return `<button class="${cls}" onclick="selectDay('${d}')">${d}</button>`;
-  }).join('');
+  document.getElementById('completedCount').textContent = completeCount + '/7';
+  document.getElementById('missedCount').textContent = missedCount;
+  document.getElementById('nextWorkout').textContent = activeItem ? formatShortDate(activeItem.date) : '--';
+  const resetMeta = document.getElementById('resetMeta');
+  if (resetMeta) {
+    resetMeta.textContent =
+      'Started ' + formatStartDate(start) + ' · resets in ' + remaining + ' day' + (remaining === 1 ? '' : 's');
+  }
 }
 
 function renderContent() {
   const data = program[current];
+  const item = getScheduleItem(current);
   const done = isDone(current);
+  const missed = getMissed().includes(current);
+  const dateLabel = item ? formatShortDate(item.date) : current;
 
   // Render only blocks that haven't been swiped away
   const blocksHtml = data.map((block, blockIdx) => {
@@ -673,29 +611,35 @@ function renderContent() {
           <div class="ex-chips">
             <span class="chip chip-weight">${ex.weight}</span>
             <span class="chip chip-reps">${ex.reps}</span>
+            ${block.note ? `<span class="chip chip-note">${block.note}</span>` : ``}
           </div>
         </div>`
       ).join('')}
     </div>`;
   }).join('');
 
-  const headingBadge = done ? `<span class="done-badge">✓ DONE</span>` : '';
-  const btnLabel = done ? 'Mark as incomplete' : 'Mark as complete';
-  const btnClass = done ? 'btn-complete is-done' : 'btn-complete';
+  const headingBadge = done
+    ? `<span class="done-badge">DONE</span>`
+    : missed
+      ? `<span class="done-badge missed-badge">MISSED</span>`
+      : '';
+  const btnLabel = done ? 'Mark as incomplete' : missed ? 'Workout missed' : 'Mark as complete';
+  const btnClass = done || missed ? 'btn-complete is-done' : 'btn-complete';
+  const btnDisabled = missed ? ' disabled' : '';
 
   document.getElementById("content").innerHTML =
-    `<div class="day-heading">${current} ${headingBadge}</div>` +
+    `<div class="day-heading">${dateLabel} · ${current} ${headingBadge}</div>` +
     blocksHtml +
     `<div class="complete-area">
-      <button class="${btnClass}" onclick="handleComplete()">${btnLabel}</button>
+      <button class="${btnClass}" onclick="handleComplete()"${btnDisabled}>${btnLabel}</button>
     </div>`;
 
   window.scrollTo(0, 0);
 }
 
 function renderAll() {
+  current = getActiveDay();
   updateCycleBar();
-  renderTabs();
   renderContent();
   addSwipeListeners(); // attach after DOM is updated
 }
@@ -703,13 +647,6 @@ function renderAll() {
 function handleComplete() {
   toggleDone(current);
   renderAll();
-}
-
-function selectDay(day) {
-  current = day;
-  localStorage.setItem('selectedDay', day);
-  renderAll();
-  document.querySelector('.day-btn.active').scrollIntoView({ inline: 'center', block: 'nearest' });
 }
 
 renderAll();
