@@ -362,6 +362,7 @@
 <script>
 const WINDOW_DAYS = 2;
 const OFFICIAL_START_DATE = new Date(2026, 5, 9);
+const ACCOUNTABILITY_START_DATE = new Date(2026, 6, 7);
 const STATE_KEY = 'workout_queue_state_v1';
 const EVENT_LOG_KEY = 'workout_event_log_v1';
 const STORAGE_HIDDEN = 'hidden_blocks';
@@ -491,10 +492,14 @@ function getOfficialStart() {
   return startOfDay(OFFICIAL_START_DATE);
 }
 
+function getAccountabilityStart() {
+  return startOfDay(ACCOUNTABILITY_START_DATE);
+}
+
 function getInitialWindowStart() {
   const today = getToday();
-  const officialStart = getOfficialStart();
-  return today < officialStart ? officialStart : today;
+  const accountabilityStart = getAccountabilityStart();
+  return today < accountabilityStart ? accountabilityStart : today;
 }
 
 function migrateLegacyState() {
@@ -548,6 +553,8 @@ function getCurrentWorkout() {
 }
 
 function reconcileState() {
+  removePreAccountabilityMisses();
+
   const stored = getStoredState();
   let nextState = stored || migrateLegacyState();
 
@@ -559,7 +566,13 @@ function reconcileState() {
   }
 
   const today = getToday();
+  const accountabilityStart = getAccountabilityStart();
   let windowStart = fromDateKey(nextState.windowStart);
+
+  if (windowStart < accountabilityStart) {
+    windowStart = accountabilityStart;
+  }
+
   let windowEndExclusive = addDays(windowStart, WINDOW_DAYS);
 
   while (today >= windowEndExclusive) {
@@ -602,13 +615,24 @@ function getYearEvents(type) {
   });
 }
 
+function removePreAccountabilityMisses() {
+  const accountabilityStart = getAccountabilityStart();
+  const events = getEventLog();
+  const filtered = events.filter(event =>
+    event.type !== 'miss' || fromDateKey(event.recordedAt) >= accountabilityStart
+  );
+  if (filtered.length !== events.length) setEventLog(filtered);
+}
+
 function getRollingMisses(daysBack) {
   const today = getToday();
+  const accountabilityStart = getAccountabilityStart();
   const start = addDays(today, -(daysBack - 1));
+  const effectiveStart = start > accountabilityStart ? start : accountabilityStart;
   return getEventLog().filter(event => {
     if (event.type !== 'miss') return false;
     const recordedAt = fromDateKey(event.recordedAt);
-    return recordedAt >= start && recordedAt <= today;
+    return recordedAt >= effectiveStart && recordedAt <= today;
   });
 }
 
