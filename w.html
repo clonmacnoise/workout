@@ -115,6 +115,9 @@
 
   .status-value.good { color: #48c59b; }
   .status-value.warn { color: #ef9f27; }
+  .status-value.performance-high { color: #48c59b; }
+  .status-value.performance-medium { color: #ef9f27; }
+  .status-value.performance-low { color: #d85a30; }
 
   .content { padding: 16px; }
 
@@ -147,6 +150,11 @@
   .missed-badge {
     background: rgba(239,159,39,0.12);
     color: #ef9f27;
+  }
+
+  .pending-badge {
+    background: rgba(127,119,221,0.12);
+    color: #a9a4ec;
   }
 
   .block-card {
@@ -270,25 +278,25 @@
 <div class="header">
   <div class="header-top">
     <span class="header-title">Workouts</span>
-    <span class="header-sub" id="cycleSubtitle">14 days left</span>
+    <span class="header-sub" id="cycleSubtitle">Window --</span>
   </div>
   <div class="cycle-bar">
-    <span class="cycle-label">Cycle</span>
+    <span class="cycle-label">Year</span>
     <div class="cycle-track"><div class="cycle-fill" id="cycleFill" style="width:0%"></div></div>
-    <span class="cycle-count" id="cycleCount">0/7</span>
+    <span class="cycle-count" id="cycleCount">Day 1</span>
   </div>
   <div class="status-grid" id="cycleStatus">
     <div class="status-item">
-      <span class="status-label">Completed</span>
-      <span class="status-value good" id="completedCount">0/7</span>
+      <span class="status-label">Done 2026</span>
+      <span class="status-value good" id="completedCount">0</span>
     </div>
     <div class="status-item">
-      <span class="status-label">Missed</span>
+      <span class="status-label">90D Miss</span>
       <span class="status-value warn" id="missedCount">0</span>
     </div>
     <div class="status-item">
-      <span class="status-label">Next</span>
-      <span class="status-value" id="nextWorkout">--</span>
+      <span class="status-label">Performance</span>
+      <span class="status-value performance-high" id="nextWorkout">High</span>
     </div>
   </div>
 </div>
@@ -352,20 +360,44 @@
 
 <script src="./program.js"></script>
 <script>
-const CYCLE_DAYS = 14;
-const WORKOUT_GAP_DAYS = 2;
+const WINDOW_DAYS = 2;
 const OFFICIAL_START_DATE = new Date(2026, 5, 9);
-const STORAGE_START     = 'cycle_start';
-const STORAGE_COMPLETED = 'cycle_completed';
-const STORAGE_HIDDEN    = 'hidden_blocks';
+const STATE_KEY = 'workout_queue_state_v1';
+const EVENT_LOG_KEY = 'workout_event_log_v1';
+const STORAGE_HIDDEN = 'hidden_blocks';
+const LEGACY_START = 'cycle_start';
+const LEGACY_COMPLETED = 'cycle_completed';
 
-const program = window.WORKOUT_PROGRAM;
-if (!program) throw new Error('Workout program failed to load.');
+const programConfig = normalizeProgram(window.WORKOUT_PROGRAM);
+const workouts = programConfig.workouts;
+if (!workouts.length) throw new Error('Workout program failed to load.');
 
-const days = Object.keys(program);
-let current = "Day 1";
+let state;
+state = reconcileState();
+let current = getCurrentWorkout();
 
-// --- Cycle helpers ---
+function normalizeProgram(raw) {
+  if (raw && Array.isArray(raw.workouts)) {
+    return {
+      version: raw.version || 'unversioned',
+      workouts: raw.workouts.map((workout, index) => ({
+        key: workout.key || 'day-' + (index + 1),
+        label: workout.label || 'Day ' + (index + 1),
+        blocks: workout.blocks || []
+      }))
+    };
+  }
+
+  return {
+    version: 'legacy',
+    workouts: Object.keys(raw || {}).map((label, index) => ({
+      key: 'day-' + (index + 1),
+      label,
+      blocks: raw[label]
+    }))
+  };
+}
+
 function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -376,123 +408,270 @@ function addDays(d, daysToAdd) {
   return next;
 }
 
-function saveCycleStart(date) {
-  const start = startOfDay(date);
-  localStorage.setItem(STORAGE_START, start.getTime());
-  setCompleted([]);
-  localStorage.removeItem(STORAGE_HIDDEN);
-  return start;
-}
-
-function getCycleStart() {
-  const today = startOfDay(new Date());
-  const officialStart = startOfDay(OFFICIAL_START_DATE);
-  const stored = localStorage.getItem(STORAGE_START);
-
-  if (!stored) return saveCycleStart(officialStart);
-
-  const parsed = parseInt(stored, 10);
-  if (Number.isNaN(parsed)) return saveCycleStart(officialStart);
-
-  const start = startOfDay(new Date(parsed));
-  const cycleEnd = addDays(start, CYCLE_DAYS);
-
-  if (start < officialStart) return saveCycleStart(officialStart);
-  if (today >= cycleEnd) return saveCycleStart(today);
-
-  return start;
-}
-
 function getToday() {
   return startOfDay(new Date());
 }
 
-function getDaysRemaining() {
-  const start = getCycleStart();
-  const end = addDays(start, CYCLE_DAYS);
-  const remaining = Math.ceil((end - getToday()) / 86400000);
-  return Math.max(0, remaining);
+function toDateKey(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
 }
 
-function formatStartDate(d) {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fromDateKey(key) {
+  const parts = String(key || '').split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return getToday();
+  return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
 function formatShortDate(d) {
   return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
-function getSchedule() {
-  const start = getCycleStart();
-  return days.map((day, index) => ({
-    day,
-    date: addDays(start, index * WORKOUT_GAP_DAYS)
-  }));
+function formatWindow(start) {
+  const end = addDays(start, WINDOW_DAYS - 1);
+  return formatShortDate(start) + '-' + formatShortDate(end);
 }
 
-function getCompleted() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_COMPLETED) || '[]'); }
-  catch { return []; }
-}
-
-function setCompleted(arr) {
-  localStorage.setItem(STORAGE_COMPLETED, JSON.stringify(arr));
-}
-
-function isDone(day) { return getCompleted().includes(day); }
-
-function getMissed() {
-  const today = getToday();
-  return getSchedule()
-    .filter(item => !isDone(item.day) && today >= addDays(item.date, WORKOUT_GAP_DAYS))
-    .map(item => item.day);
-}
-
-function getScheduleItem(day) {
-  return getSchedule().find(item => item.day === day);
-}
-
-function getActiveDay() {
-  const missed = getMissed();
-  const next = getSchedule().find(item => !isDone(item.day) && !missed.includes(item.day));
-  return next ? next.day : days[days.length - 1];
-}
-
-function toggleDone(day) {
-  if (getMissed().includes(day)) return;
-  let completed = getCompleted();
-  if (completed.includes(day)) {
-    completed = completed.filter(d => d !== day);
-  } else {
-    completed.push(day);
+function getEventLog() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EVENT_LOG_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
-  setCompleted(completed);
 }
 
-// --- Hidden block helpers ---
+function setEventLog(events) {
+  localStorage.setItem(EVENT_LOG_KEY, JSON.stringify(events));
+}
+
+function appendEvent(event) {
+  const events = getEventLog();
+  events.push({
+    id: event.type + '-' + event.workoutKey + '-' + event.windowStart + '-' + Date.now(),
+    schemaVersion: 1,
+    programVersion: programConfig.version,
+    ...event
+  });
+  setEventLog(events);
+}
+
+function getStoredState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.currentWorkoutIndex !== 'number') return null;
+    if (!parsed.windowStart) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveState(nextState) {
+  state = {
+    schemaVersion: 1,
+    programVersion: programConfig.version,
+    currentWorkoutIndex: clampWorkoutIndex(nextState.currentWorkoutIndex),
+    windowStart: toDateKey(startOfDay(fromDateKey(nextState.windowStart))),
+    updatedAt: toDateKey(getToday())
+  };
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  return state;
+}
+
+function clampWorkoutIndex(index) {
+  if (!Number.isFinite(index)) return 0;
+  return Math.max(0, Math.min(workouts.length - 1, index));
+}
+
+function getOfficialStart() {
+  return startOfDay(OFFICIAL_START_DATE);
+}
+
+function getInitialWindowStart() {
+  const today = getToday();
+  const officialStart = getOfficialStart();
+  return today < officialStart ? officialStart : today;
+}
+
+function migrateLegacyState() {
+  let completed = [];
+  try {
+    completed = JSON.parse(localStorage.getItem(LEGACY_COMPLETED) || '[]');
+    if (!Array.isArray(completed)) completed = [];
+  } catch {
+    completed = [];
+  }
+
+  const storedStart = parseInt(localStorage.getItem(LEGACY_START) || '', 10);
+  const legacyStart = Number.isNaN(storedStart) ? getInitialWindowStart() : startOfDay(new Date(storedStart));
+  const completedCount = Math.min(completed.length, workouts.length);
+
+  if (completedCount && getEventLog().length === 0) {
+    const imported = completed.slice(0, completedCount).map((label, index) => {
+      const workout = workouts[index];
+      const completedAt = toDateKey(addDays(legacyStart, index * WINDOW_DAYS));
+      return {
+        id: 'legacy-complete-' + workout.key + '-' + completedAt,
+        schemaVersion: 1,
+        programVersion: programConfig.version,
+        type: 'complete',
+        workoutKey: workout.key,
+        workoutLabel: workout.label || label,
+        windowStart: completedAt,
+        windowEnd: toDateKey(addDays(fromDateKey(completedAt), WINDOW_DAYS - 1)),
+        completedAt,
+        importedFrom: 'cycle_completed'
+      };
+    });
+    setEventLog(imported);
+  }
+
+  if (completedCount >= workouts.length) {
+    return saveState({
+      currentWorkoutIndex: 0,
+      windowStart: toDateKey(addDays(legacyStart, workouts.length * WINDOW_DAYS))
+    });
+  }
+
+  return saveState({
+    currentWorkoutIndex: completedCount,
+    windowStart: toDateKey(addDays(legacyStart, completedCount * WINDOW_DAYS))
+  });
+}
+
+function getCurrentWorkout() {
+  return workouts[clampWorkoutIndex(state.currentWorkoutIndex)];
+}
+
+function reconcileState() {
+  const stored = getStoredState();
+  let nextState = stored || migrateLegacyState();
+
+  if (nextState.programVersion !== programConfig.version) {
+    nextState = saveState({
+      ...nextState,
+      currentWorkoutIndex: clampWorkoutIndex(nextState.currentWorkoutIndex)
+    });
+  }
+
+  const today = getToday();
+  let windowStart = fromDateKey(nextState.windowStart);
+  let windowEndExclusive = addDays(windowStart, WINDOW_DAYS);
+
+  while (today >= windowEndExclusive) {
+    const workout = workouts[clampWorkoutIndex(nextState.currentWorkoutIndex)];
+    appendEvent({
+      type: 'miss',
+      workoutKey: workout.key,
+      workoutLabel: workout.label,
+      windowStart: toDateKey(windowStart),
+      windowEnd: toDateKey(addDays(windowEndExclusive, -1)),
+      recordedAt: toDateKey(windowEndExclusive)
+    });
+    windowStart = windowEndExclusive;
+    windowEndExclusive = addDays(windowStart, WINDOW_DAYS);
+  }
+
+  return saveState({
+    ...nextState,
+    windowStart: toDateKey(windowStart)
+  });
+}
+
+function getWindowStart() {
+  return fromDateKey(state.windowStart);
+}
+
+function getWindowEnd() {
+  return addDays(getWindowStart(), WINDOW_DAYS - 1);
+}
+
+function isWindowOpen() {
+  return getToday() >= getWindowStart();
+}
+
+function getYearEvents(type) {
+  const year = getToday().getFullYear();
+  return getEventLog().filter(event => {
+    const key = event.completedAt || event.recordedAt;
+    return event.type === type && fromDateKey(key).getFullYear() === year;
+  });
+}
+
+function getRollingMisses(daysBack) {
+  const today = getToday();
+  const start = addDays(today, -(daysBack - 1));
+  return getEventLog().filter(event => {
+    if (event.type !== 'miss') return false;
+    const recordedAt = fromDateKey(event.recordedAt);
+    return recordedAt >= start && recordedAt <= today;
+  });
+}
+
+function getPerformance(missCount) {
+  if (missCount <= 4) return 'High';
+  if (missCount <= 10) return 'Medium';
+  return 'Low';
+}
+
+function getCurrentWorkoutMisses() {
+  const workout = getCurrentWorkout();
+  const lastCompleteIndex = [...getEventLog()].reverse().findIndex(event =>
+    event.type === 'complete' && event.workoutKey === workout.key
+  );
+  const events = getEventLog();
+  const cutoff = lastCompleteIndex === -1 ? -1 : events.length - 1 - lastCompleteIndex;
+  return events.filter((event, index) =>
+    index > cutoff && event.type === 'miss' && event.workoutKey === workout.key
+  ).length;
+}
+
+function completeCurrentWorkout() {
+  if (!isWindowOpen()) return;
+
+  const workout = getCurrentWorkout();
+  const today = getToday();
+  appendEvent({
+    type: 'complete',
+    workoutKey: workout.key,
+    workoutLabel: workout.label,
+    windowStart: state.windowStart,
+    windowEnd: toDateKey(getWindowEnd()),
+    completedAt: toDateKey(today)
+  });
+
+  localStorage.removeItem(STORAGE_HIDDEN);
+
+  saveState({
+    currentWorkoutIndex: (state.currentWorkoutIndex + 1) % workouts.length,
+    windowStart: toDateKey(addDays(today, 1))
+  });
+
+  state = reconcileState();
+  current = getCurrentWorkout();
+}
+
 function getHiddenBlocks() {
   try { return JSON.parse(localStorage.getItem(STORAGE_HIDDEN) || '{}'); }
   catch { return {}; }
 }
 
-function isBlockHidden(day, blockIdx) {
+function isBlockHidden(workoutKey, blockIdx) {
   const hidden = getHiddenBlocks();
-  return !!(hidden[day] && hidden[day].includes(blockIdx));
+  return !!(hidden[workoutKey] && hidden[workoutKey].includes(blockIdx));
 }
 
-function hideBlock(day, blockIdx) {
+function hideBlock(workoutKey, blockIdx) {
   const hidden = getHiddenBlocks();
-  if (!hidden[day]) hidden[day] = [];
-  if (!hidden[day].includes(blockIdx)) hidden[day].push(blockIdx);
+  if (!hidden[workoutKey]) hidden[workoutKey] = [];
+  if (!hidden[workoutKey].includes(blockIdx)) hidden[workoutKey].push(blockIdx);
   localStorage.setItem(STORAGE_HIDDEN, JSON.stringify(hidden));
 }
 
-function handleReset() {
-  saveCycleStart(getToday());
-  renderAll();
-}
-
-// --- Swipe to hide ---
 function addSwipeListeners() {
   document.querySelectorAll('.block-card').forEach(card => {
     let startX = 0, startY = 0, tracking = false, dismissed = false;
@@ -502,7 +681,6 @@ function addSwipeListeners() {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;
-      // Remove any transition so dragging feels instant
       card.style.transition = 'none';
     }, { passive: true });
 
@@ -510,11 +688,9 @@ function addSwipeListeners() {
       if (!tracking || dismissed) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      // Only intercept clearly horizontal left-swipes
       if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
         const clamped = Math.max(dx, -window.innerWidth);
         card.style.transform = `translateX(${clamped}px)`;
-        // Fade out as it travels — fully transparent at half-screen
         card.style.opacity = String(Math.max(0, 1 + clamped / (window.innerWidth * 0.5)));
       }
     }, { passive: true });
@@ -525,36 +701,29 @@ function addSwipeListeners() {
       const dx = e.changedTouches[0].clientX - startX;
 
       if (dx < -80) {
-        // Crossed threshold — commit the dismiss
         dismissed = true;
         const blockIdx = parseInt(card.dataset.blockIndex, 10);
 
-        // Phase 1: slide fully off screen
         card.style.transition = 'transform 0.25s ease-out, opacity 0.2s ease-out';
         card.style.transform = 'translateX(-110vw)';
         card.style.opacity = '0';
 
         setTimeout(() => {
-          // Phase 2: collapse height so cards below slide up
           const h = card.offsetHeight;
           card.style.transition = 'none';
           card.style.maxHeight = h + 'px';
           card.style.overflow = 'hidden';
-          // Force reflow so the browser registers the starting max-height
           void card.offsetHeight;
           card.style.transition = 'max-height 0.25s ease-out, margin-bottom 0.25s ease-out';
           card.style.maxHeight = '0';
           card.style.marginBottom = '0';
 
           setTimeout(() => {
-            // Save state and remove from DOM — no re-render needed
-            hideBlock(current, blockIdx);
+            hideBlock(current.key, blockIdx);
             card.remove();
           }, 260);
         }, 260);
-
       } else {
-        // Didn't reach threshold — snap back
         card.style.transition = 'transform 0.25s ease-out, opacity 0.2s ease-out';
         card.style.transform = '';
         card.style.opacity = '';
@@ -564,41 +733,35 @@ function addSwipeListeners() {
   });
 }
 
-// --- Render ---
-function updateCycleBar() {
-  const completed = getCompleted();
-  const missed = getMissed();
-  const completeCount = completed.length;
-  const missedCount = missed.length;
-  const resolvedCount = completeCount + missedCount;
-  const pct = Math.round((resolvedCount / days.length) * 100);
-  const remaining = getDaysRemaining();
-  const start = getCycleStart();
-  const activeItem = getScheduleItem(current);
+function updateHeader() {
+  const yearDone = getYearEvents('complete').length;
+  const rollingMisses = getRollingMisses(90).length;
+  const performance = getPerformance(rollingMisses);
+  const currentMisses = getCurrentWorkoutMisses();
+  const pct = Math.min(100, Math.round((yearDone / 104) * 100));
+  const perfClass = performance.toLowerCase();
 
   document.getElementById('cycleFill').style.width = pct + '%';
-  document.getElementById('cycleCount').textContent = completeCount + ' done · ' + missedCount + ' missed';
-  document.getElementById('cycleSubtitle').textContent = remaining + ' days left';
-  document.getElementById('completedCount').textContent = completeCount + '/7';
-  document.getElementById('missedCount').textContent = missedCount;
-  document.getElementById('nextWorkout').textContent = activeItem ? formatShortDate(activeItem.date) : '--';
-  const resetMeta = document.getElementById('resetMeta');
-  if (resetMeta) {
-    resetMeta.textContent =
-      'Started ' + formatStartDate(start) + ' · resets in ' + remaining + ' day' + (remaining === 1 ? '' : 's');
-  }
+  document.getElementById('cycleCount').textContent =
+    current.label + ' · due ' + formatShortDate(getWindowEnd());
+  document.getElementById('cycleSubtitle').textContent =
+    'Window ' + formatWindow(getWindowStart());
+  document.getElementById('completedCount').textContent = yearDone;
+  document.getElementById('missedCount').textContent = rollingMisses;
+  const performanceEl = document.getElementById('nextWorkout');
+  performanceEl.textContent = performance;
+  performanceEl.className = 'status-value performance-' + perfClass;
 }
 
 function renderContent() {
-  const data = program[current];
-  const item = getScheduleItem(current);
-  const done = isDone(current);
-  const missed = getMissed().includes(current);
-  const dateLabel = item ? formatShortDate(item.date) : current;
+  const data = current.blocks;
+  const windowStart = getWindowStart();
+  const windowEnd = getWindowEnd();
+  const currentMisses = getCurrentWorkoutMisses();
+  const startsInFuture = !isWindowOpen();
 
-  // Render only blocks that haven't been swiped away
   const blocksHtml = data.map((block, blockIdx) => {
-    if (isBlockHidden(current, blockIdx)) return '';
+    if (isBlockHidden(current.key, blockIdx)) return '';
     return `<div class="block-card" data-block-index="${blockIdx}">
       <div class="block-header">
         <div class="block-badge badge-${block.block}">${block.block}</div>
@@ -618,17 +781,20 @@ function renderContent() {
     </div>`;
   }).join('');
 
-  const headingBadge = done
-    ? `<span class="done-badge">DONE</span>`
-    : missed
-      ? `<span class="done-badge missed-badge">MISSED</span>`
-      : '';
-  const btnLabel = done ? 'Mark as incomplete' : missed ? 'Workout missed' : 'Mark as complete';
-  const btnClass = done || missed ? 'btn-complete is-done' : 'btn-complete';
-  const btnDisabled = missed ? ' disabled' : '';
+  const missBadge = currentMisses
+    ? `<span class="done-badge missed-badge">${currentMisses} MISSED</span>`
+    : '';
+  const pendingBadge = startsInFuture
+    ? `<span class="done-badge pending-badge">STARTS ${formatShortDate(windowStart)}</span>`
+    : '';
+  const btnLabel = startsInFuture
+    ? 'Starts ' + formatShortDate(windowStart)
+    : 'Mark workout complete';
+  const btnClass = startsInFuture ? 'btn-complete is-done' : 'btn-complete';
+  const btnDisabled = startsInFuture ? ' disabled' : '';
 
-  document.getElementById("content").innerHTML =
-    `<div class="day-heading">${dateLabel} · ${current} ${headingBadge}</div>` +
+  document.getElementById('content').innerHTML =
+    `<div class="day-heading">${current.label} · ${formatWindow(windowStart)} ${missBadge}${pendingBadge}</div>` +
     blocksHtml +
     `<div class="complete-area">
       <button class="${btnClass}" onclick="handleComplete()"${btnDisabled}>${btnLabel}</button>
@@ -638,14 +804,15 @@ function renderContent() {
 }
 
 function renderAll() {
-  current = getActiveDay();
-  updateCycleBar();
+  state = reconcileState();
+  current = getCurrentWorkout();
+  updateHeader();
   renderContent();
-  addSwipeListeners(); // attach after DOM is updated
+  addSwipeListeners();
 }
 
 function handleComplete() {
-  toggleDone(current);
+  completeCurrentWorkout();
   renderAll();
 }
 
