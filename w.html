@@ -119,6 +119,18 @@
   .status-value.performance-medium { color: #ef9f27; }
   .status-value.performance-low { color: #d85a30; }
 
+  .consistency-message {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(29,158,117,0.12);
+    border: 1px solid rgba(72,197,155,0.2);
+    color: #48c59b;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
   .content { padding: 16px; }
 
   .day-heading {
@@ -299,6 +311,7 @@
       <span class="status-value performance-high" id="nextWorkout">High</span>
     </div>
   </div>
+  <div class="consistency-message" id="consistencyMessage" role="status" aria-live="polite" hidden></div>
 </div>
 
 <div class="content" id="content"><div class="day-heading">Day 6 </div><div class="block-card" data-block-index="0">
@@ -358,7 +371,7 @@
     </div></div>
 
 
-<script src="./program.js"></script>
+<script src="./program.js?v=2026-09-11"></script>
 <script>
 const WINDOW_DAYS = 2;
 const OFFICIAL_START_DATE = new Date(2026, 5, 9);
@@ -642,6 +655,23 @@ function getPerformance(missCount) {
   return 'Low';
 }
 
+function getConsistencyStreak() {
+  const events = getEventLog();
+  let streak = 0;
+  // Events are appended in order. A missed window ends the current streak.
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].type === 'miss') break;
+    if (events[i].type === 'complete') streak++;
+  }
+  return streak;
+}
+
+function getConsistencyMessage(streak) {
+  if (streak === 1) return 'One down—keep going.';
+  if (streak === 2) return '2 in a row—building momentum.';
+  return streak >= 3 ? streak + ' in a row!' : '';
+}
+
 function getCurrentWorkoutMisses() {
   const workout = getCurrentWorkout();
   const lastCompleteIndex = [...getEventLog()].reverse().findIndex(event =>
@@ -775,6 +805,10 @@ function updateHeader() {
   const performanceEl = document.getElementById('nextWorkout');
   performanceEl.textContent = performance;
   performanceEl.className = 'status-value performance-' + perfClass;
+  const consistencyEl = document.getElementById('consistencyMessage');
+  const consistencyMessage = getConsistencyMessage(getConsistencyStreak());
+  consistencyEl.textContent = consistencyMessage;
+  consistencyEl.hidden = !consistencyMessage;
 }
 
 function renderContent() {
